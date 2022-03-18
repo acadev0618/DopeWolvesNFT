@@ -13,8 +13,6 @@ import "hardhat/console.sol";
  * @dev Stake NFTs, earn tokens on the DW platform
  * @author Aleksandar Todorovic
  */
-
- 
  contract DWNFTStaking {
     using SafeMath for uint256;
 
@@ -27,13 +25,8 @@ import "hardhat/console.sol";
     uint256 allEpicTokenCnt;
     uint256 allLegendaryTokenCnt;
 
-    uint256 public commonRewardRate;
-    uint256 public uncommonRewardRate;
-    uint256 public rateRewardRate;
-    uint256 public epicRewardRate;
-    uint256 public LegendaryRewardRate;
-    uint256 public amount;
     uint256 public balanceOfRewardToken;
+    bool isHuntingSeason;
 
     struct Staker {
         uint256[] tokenIds;
@@ -43,11 +36,11 @@ import "hardhat/console.sol";
         uint256 rareTokenCnt;
         uint256 epicTokenCnt;
         uint256 legendaryTokenCnt;
+        bool rewarded;
     }
     mapping (address => Staker) public stakers;
 
     enum Rarity_Level {COMMON, UNUSUAL, RARE, EPIC, LEGENDARY}
-
     // for staking and unstaking
     uint constant COMMUNITY_WALLETS_PERSENT = 70; // 70% of the transaction fee
     uint constant TEAM_WALLETS_PERSENT = 30; // 30% of the transaction fee
@@ -58,15 +51,14 @@ import "hardhat/console.sol";
     struct TokenRoyalty {
         address owner;
         Rarity_Level rarityLevel;
+        bool isStaking;
     }
     mapping(uint256 => TokenRoyalty) public tokenRoyalty;
 
     /// @notice event emitted when a user has staked a token
     event Staked(address owner, uint256 amount);
-
     /// @notice event emitted when a user has unstaked a token
     event Unstaked(address owner, uint256 amount);
-
     /// @notice event emitted when a user claims reward
     event RewardPaid(address indexed user, uint256 reward);
     event RewardsTokenUpdated(address indexed oldRewardsToken, address newRewardsToken );
@@ -106,23 +98,80 @@ import "hardhat/console.sol";
         return rewardsToken.balanceOf(msg.sender);
     }
 
-    function setRewardContract(address _addr) external
-    {
-        address oldAddr = address(rewardsToken);
-        rewardsToken = IERC20(_addr);
-        emit RewardsTokenUpdated(oldAddr, _addr);
+    function timeOutHuntingSeason() public {
+        balanceOfRewardToken = rewardsToken.balanceOf(msg.sender).mul(70).div(100);
+        // reward all users
+        uint256 balance = stakingToken.totalSupply();
+        for (uint i = 0; i < balance; i++) {
+            TokenRoyalty storage token = tokenRoyalty[i];
+            if(token.isStaking && ! stakers[token.owner].rewarded){
+                claimReward(token.owner);
+                console.log("claimReward : ", token.owner);
+            }
+        }
+        // all unstaking
+        for (uint i = 0; i < balance; i++) {
+            TokenRoyalty storage token = tokenRoyalty[i];
+            if(token.isStaking){
+                console.log("unstaked ", token.owner, " tokenid:  ", i);
+                _unstake(token.owner, i);
+            }
+        }
+        // set hunt season false
+        isHuntingSeason = false;
+    }
+
+    function startHuntingSeason() public {
+        isHuntingSeason = true;
+    }
+
+    /// @notice Lets a user with rewards owing to claim tokens
+    function claimReward(address _user) public {
+        uint256 commonRewardRate;
+        uint256 uncommonRewardRate;
+        uint256 rateRewardRate;
+        uint256 epicRewardRate;
+        uint256 LegendaryRewardRate;
+        uint256 amount;
+
+        require(balanceOfRewardToken > 0, " low balance of rewards token");
+        if (allCommonTokenCnt > 0)
+            commonRewardRate = (balanceOfRewardToken.mul(rarityLevelRate[Rarity_Level.COMMON]).div(100)).div(allCommonTokenCnt);
+        if (allUncommonTokenCnt > 0) 
+            uncommonRewardRate = (balanceOfRewardToken.mul(rarityLevelRate[Rarity_Level.UNUSUAL]).div(100)).div(allUncommonTokenCnt);
+        if (allRareTokenCnt > 0)
+            rateRewardRate = (balanceOfRewardToken.mul(rarityLevelRate[Rarity_Level.RARE]).div(100)).div(allRareTokenCnt);
+        if (allRareTokenCnt > 0)
+            epicRewardRate = (balanceOfRewardToken.mul(rarityLevelRate[Rarity_Level.EPIC]).div(100)).div(allEpicTokenCnt);
+        if (allRareTokenCnt > 0)
+            LegendaryRewardRate = (balanceOfRewardToken.mul(rarityLevelRate[Rarity_Level.LEGENDARY]).div(100)).div(allLegendaryTokenCnt);
+        
+        Staker storage staker = stakers[_user];
+
+        amount = (staker.commonTokenCnt.mul(commonRewardRate)) + 
+                (staker.uncommonTokenCnt.mul(uncommonRewardRate)) +
+                (staker.rareTokenCnt.mul(rateRewardRate)) +
+                (staker.epicTokenCnt.mul(epicRewardRate)) +
+                (staker.legendaryTokenCnt.mul(LegendaryRewardRate));
+
+        console.log("Reward amount for Adress: ", amount, _user);
+
+        // rewardsToken.transferFrom(msg.sender, _user, amount);
+        staker.rewarded = true;
     }
 
     /// @notice Stake NFTs
     function stake(uint256 _tokenId) external
     {
-        require(msg.sender == stakingToken.ownerOf(_tokenId), "DWNFTStaking.unstake: Sender must be the owner of NFT");
+        require(isHuntingSeason, "DWNFTStaking.stake:now it's not hunt season, so can't stake dope wolves");
+        require(msg.sender == stakingToken.ownerOf(_tokenId), "DWNFTStaking.stake: Sender must be the owner of NFT");
         _stake(msg.sender, _tokenId);
     }
 
     /// @notice Stake multiple NFTs.
     function stakeBatch(uint256[] memory _tokenIds) external
     {
+        require(isHuntingSeason, "DWNFTStaking.stake:now it's not hunt season, so can't stake dope wolves");
         for (uint i = 0; i < _tokenIds.length; i++) {
             if (msg.sender == stakingToken.ownerOf(_tokenIds[i])){
             _stake(msg.sender, _tokenIds[i]);
@@ -131,21 +180,24 @@ import "hardhat/console.sol";
     }
 
     /// @notice Stake all your NFTs.
-    function stakeAll(address _owner) external
-    {
-        uint256 balance = stakingToken.balanceOf(_owner);
-        for (uint i = 0; i < balance; i++) {
-            _stake(_owner, stakingToken.tokenOfOwnerByIndex(_owner,i));
-        }
-    }
+    // function stakeAll(address _owner) external
+    // {
+    //     uint256 balance = stakingToken.balanceOf(_owner);
+    //     for (uint i = 0; i < balance; i++) {
+    //         console.log("tokenid : ", stakingToken.tokenOfOwnerByIndex(_owner,i));
+    //         _stake(_owner, stakingToken.tokenOfOwnerByIndex(_owner,i));
+    //     }
+    // }
 
     /**
      * @dev All the staking goes through this function
     */
-    function _stake(address _user, uint256 _tokenId) public {
+    function _stake(address _user, uint256 _tokenId) internal {
         tokenRoyalty[_tokenId].owner = _user;
         Staker storage staker = stakers[_user];
         TokenRoyalty storage token = tokenRoyalty[_tokenId];
+        token.owner = _user;
+        token.isStaking = true;
 
         if (token.rarityLevel == Rarity_Level.COMMON) {
             staker.commonTokenCnt++;
@@ -180,15 +232,12 @@ import "hardhat/console.sol";
     function unstake(uint256 _tokenId) external
     {
         require(msg.sender == tokenRoyalty[_tokenId].owner, "DWNFTStaking.unstake: Sender must have staked tokenID");
-        // claimReward(msg.sender);
         _unstake(msg.sender, _tokenId);
-        
     }
 
     /// @notice Stake multiple  NFTs
     function unstakeBatch(uint256[] memory tokenIds) external
     {
-        // claimReward(msg.sender);
         for (uint i = 0; i < tokenIds.length; i++) {
             if (tokenRoyalty[tokenIds[i]].owner == msg.sender) {
                 _unstake(msg.sender, tokenIds[i]);
