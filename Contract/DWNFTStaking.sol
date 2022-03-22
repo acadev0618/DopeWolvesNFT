@@ -25,7 +25,7 @@ import "hardhat/console.sol";
     uint256 allEpicTokenCnt;
     uint256 allLegendaryTokenCnt;
 
-    uint256 public balanceOfRewardToken;
+    uint256 private balanceOfRewardToken;
     bool isHuntingSeason;
 
     struct Staker {
@@ -42,8 +42,8 @@ import "hardhat/console.sol";
 
     enum Rarity_Level {COMMON, UNUSUAL, RARE, EPIC, LEGENDARY}
     // for staking and unstaking
-    uint constant COMMUNITY_WALLETS_PERSENT = 70; // 70% of the transaction fee
-    uint constant TEAM_WALLETS_PERSENT = 30; // 30% of the transaction fee
+    uint constant private COMMUNITY_WALLETS_PERSENT = 70; // 70% of the transaction fee
+    uint constant private TEAM_WALLETS_PERSENT = 30; // 30% of the transaction fee
 
     // default persent of wolf
     mapping(Rarity_Level => uint256) public rarityLevelRate;
@@ -61,28 +61,28 @@ import "hardhat/console.sol";
     event Unstaked(address owner, uint256 amount);
     /// @notice event emitted when a user claims reward
     event RewardPaid(address indexed user, uint256 reward);
-    event RewardsTokenUpdated(address indexed oldRewardsToken, address newRewardsToken );
 
-    constructor(address _rewardsToken, address _stakingToken) public{
+    constructor(address _rewardsToken, address _stakingToken){
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC721Enumerable(_stakingToken);
         setDefaultTokenRoyalty();
+        balanceOfRewardToken = getBalanceRewardToken().mul(70).div(100);
     }
 
     /// @dev Getter functions for Staking contract
     /// @dev Get the tokens staked by a user
-    function getStakedTokens(address _user) external view
-        returns (uint256[] memory tokenIds)
+    function getStakedTokens(address _user) public view
+        returns (uint256[] memory)
     {
         return stakers[_user].tokenIds;
     }
 
-    function setRarityLevel(uint256 _tokenId, Rarity_Level level) public {
+    function setRarityLevel(uint256 _tokenId, Rarity_Level level) external {
         TokenRoyalty storage token = tokenRoyalty[_tokenId];
         token.rarityLevel = level;
     }
 
-    function setTokenRoyalty(Rarity_Level _rarity_level, uint256 persent) public {
+    function setTokenRoyalty(Rarity_Level _rarity_level, uint256 persent) external {
         rarityLevelRate[_rarity_level] = persent;
     }
 
@@ -98,8 +98,12 @@ import "hardhat/console.sol";
         return rewardsToken.balanceOf(msg.sender);
     }
 
+    function startHuntingSeason() public {
+        isHuntingSeason = true;
+    }
+
     function timeOutHuntingSeason() public {
-        balanceOfRewardToken = rewardsToken.balanceOf(msg.sender).mul(70).div(100);
+        balanceOfRewardToken = getBalanceRewardToken().mul(70).div(100);
         // reward all users
         uint256 balance = stakingToken.totalSupply();
         for (uint i = 0; i < balance; i++) {
@@ -121,23 +125,17 @@ import "hardhat/console.sol";
         isHuntingSeason = false;
     }
 
-    function startHuntingSeason() public {
-        isHuntingSeason = true;
-    }
-
-    /// @notice Lets a user with rewards owing to claim tokens
-    function claimReward(address _user) public {
+    function calculateRewardAmount(address _user) public view returns (uint256) {
         uint256 commonRewardRate;
         uint256 uncommonRewardRate;
         uint256 rateRewardRate;
         uint256 epicRewardRate;
         uint256 LegendaryRewardRate;
-        uint256 amount;
 
         require(balanceOfRewardToken > 0, " low balance of rewards token");
         if (allCommonTokenCnt > 0)
             commonRewardRate = (balanceOfRewardToken.mul(rarityLevelRate[Rarity_Level.COMMON]).div(100)).div(allCommonTokenCnt);
-        if (allUncommonTokenCnt > 0) 
+        if (allUncommonTokenCnt > 0)
             uncommonRewardRate = (balanceOfRewardToken.mul(rarityLevelRate[Rarity_Level.UNUSUAL]).div(100)).div(allUncommonTokenCnt);
         if (allRareTokenCnt > 0)
             rateRewardRate = (balanceOfRewardToken.mul(rarityLevelRate[Rarity_Level.RARE]).div(100)).div(allRareTokenCnt);
@@ -148,16 +146,24 @@ import "hardhat/console.sol";
         
         Staker storage staker = stakers[_user];
 
-        amount = (staker.commonTokenCnt.mul(commonRewardRate)) + 
+        uint256 amount = (staker.commonTokenCnt.mul(commonRewardRate)) +
                 (staker.uncommonTokenCnt.mul(uncommonRewardRate)) +
                 (staker.rareTokenCnt.mul(rateRewardRate)) +
                 (staker.epicTokenCnt.mul(epicRewardRate)) +
                 (staker.legendaryTokenCnt.mul(LegendaryRewardRate));
 
         console.log("Reward amount for Adress: ", amount, _user);
+        return amount;
+    }
 
+    /// @notice Lets a user with rewards owing to claim tokens
+    function claimReward(address _user) private {
+        uint256 amount;
+        amount = calculateRewardAmount(_user);
         // rewardsToken.transferFrom(msg.sender, _user, amount);
+        Staker storage staker = stakers[_user];
         staker.rewarded = true;
+        emit RewardPaid(_user, amount);
     }
 
     /// @notice Stake NFTs
@@ -247,7 +253,7 @@ import "hardhat/console.sol";
     /**
      * @dev All the unstaking goes through this function
     */
-    function _unstake(address _user, uint256 _tokenId) public {
+    function _unstake(address _user, uint256 _tokenId) private {
         Staker storage staker = stakers[_user];
         TokenRoyalty storage token = tokenRoyalty[_tokenId];
 
