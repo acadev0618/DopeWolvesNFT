@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.3;
 
 //import "contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 //import "contracts/access/Ownable.sol";

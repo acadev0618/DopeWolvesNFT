@@ -1,4 +1,4 @@
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.3;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "hardhat/console.sol";
@@ -8,8 +8,8 @@ import "hardhat/console.sol";
  * @dev Very simple ERC20 Token example, where all 10000 tokens are pre-assigned to the creator.
  */
 contract LoxarToken is ERC20 {
-    string public constant NAME = "Loxar";
-    string public constant SYMBOL = "LXR";
+    string public constant NAME = "ERC-20 TOKEN ";
+    string public constant SYMBOL = "ROSE-DW";
     uint8 public constant DECIMALS = 18;
 
     // Total Supply: 2.000.000

@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    background-color:#141416   ;
+}
+h1 {
+    color: #676375  !important;
+}
+
+button {
+    background-color:#3772ff  !important;
+    color: #fff !important;
+}
+input{
+    color: rgb(160, 147, 147)  !important;
+}

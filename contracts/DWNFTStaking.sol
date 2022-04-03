@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.3;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
@@ -25,7 +25,7 @@ import "hardhat/console.sol";
     uint256 allEpicTokenCnt;
     uint256 allLegendaryTokenCnt;
 
-    uint256 private balanceOfRewardToken;
+    uint256 public balanceOfRewardToken;
     bool isHuntingSeason;
 
     struct Staker {
@@ -98,11 +98,11 @@ import "hardhat/console.sol";
         return rewardsToken.balanceOf(msg.sender);
     }
 
-    function startHuntingSeason() public {
+    function startHuntingSeason() external {
         isHuntingSeason = true;
     }
 
-    function timeOutHuntingSeason() public {
+    function timeOutHuntingSeason() external {
         balanceOfRewardToken = getBalanceRewardToken().mul(70).div(100);
         // reward all users
         uint256 balance = stakingToken.totalSupply();
@@ -132,7 +132,7 @@ import "hardhat/console.sol";
         uint256 epicRewardRate;
         uint256 LegendaryRewardRate;
 
-        require(balanceOfRewardToken > 0, " low balance of rewards token");
+        require(balanceOfRewardToken > 0, "DWNFTStaking.calculateRewardAmount: low balance of rewards token");
         if (allCommonTokenCnt > 0)
             commonRewardRate = (balanceOfRewardToken.mul(rarityLevelRate[Rarity_Level.COMMON]).div(100)).div(allCommonTokenCnt);
         if (allUncommonTokenCnt > 0)
