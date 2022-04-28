@@ -3,9 +3,9 @@ import { ethers } from "ethers";
 import { useRouter } from "next/router";
 import Web3Modal from "web3modal";
 
-import { nftaddress, nftmarketaddress } from "../config";
+import { nftaddress} from "./config";
 
-import DWNFT from '../artifacts/contracts/DopeWolvesNFT.sol/DopeWolvesNFT.json';
+import DWNFT from '../contracts_abi/DopeWolvesNFT.json';
 
 export default function MintNFT() {
   const [mintAmount, setMintAmount] = useState();
@@ -31,7 +31,7 @@ export default function MintNFT() {
     console.log("amount: ", mintAmount, "price:", cost);
 
     let transaction = await tokenContract.mint(address, mintAmount, {value: price});
-    
+
     await transaction.wait();
     router.push("/");
   }

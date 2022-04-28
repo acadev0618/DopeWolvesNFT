@@ -4,11 +4,10 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import Web3Modal from "web3modal";
 
-import { nftaddress, nftmarketaddress } from "../config";
+import { nftaddress, nftmarketaddress } from "./config";
 
-import DWNFT from '../artifacts/contracts/DopeWolvesNFT.sol/DopeWolvesNFT.json';
-import DWNFTStaking from '../artifacts/contracts/DWNFTStaking.sol/DWNFTStaking.json';
-import { faL } from "@fortawesome/free-solid-svg-icons";
+import DWNFT from '../contracts_abi/DopeWolvesNFT.json';
+import DWNFTStaking from '../contracts_abi/DWNFTStaking.json';
 
 
 export default function Home() {
