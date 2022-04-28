@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { useRouter } from "next/router";
 import Web3Modal from "web3modal";
 
-import { nftaddress} from "./config";
+import { nftaddress} from "../config";
 
 import DWNFT from '../contracts_abi/DopeWolvesNFT.json';
 
