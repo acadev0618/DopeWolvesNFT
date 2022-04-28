@@ -53,7 +53,7 @@ npx hardhat node
 3. With the network running, deploy the contracts to the local network in a separate terminal window
 
 ```sh
-npx hardhat run scripts/deploy.js --network localhost
+npx hardhat run scripts/dope_deploy.js --network localhost
 ```
 
 4. Start the app

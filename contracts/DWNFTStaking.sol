@@ -13,7 +13,7 @@ import "hardhat/console.sol";
  * @dev Stake NFTs, earn tokens on the DW platform
  * @author Aleksandar Todorovic
  */
- contract DWNFTStaking {
+ contract DWNFTStaking is Ownable{
     using SafeMath for uint256;
 
     IERC20 public rewardsToken;
@@ -26,7 +26,7 @@ import "hardhat/console.sol";
     uint256 allLegendaryTokenCnt;
 
     uint256 public balanceOfRewardToken;
-    bool isHuntingSeason;
+    bool public isHuntingSeason;
 
     struct Staker {
         uint256[] tokenIds;
@@ -69,6 +69,12 @@ import "hardhat/console.sol";
         balanceOfRewardToken = getBalanceRewardToken().mul(70).div(100);
     }
 
+    function isAdmin() external view returns (bool) {
+        if (msg.sender == owner())
+            return true;
+        return false;
+    }
+
     /// @dev Getter functions for Staking contract
     /// @dev Get the tokens staked by a user
     function getStakedTokens(address _user) public view
@@ -98,11 +104,13 @@ import "hardhat/console.sol";
         return rewardsToken.balanceOf(msg.sender);
     }
 
-    function startHuntingSeason() external {
+    function startHuntingSeason() external onlyOwner {
         isHuntingSeason = true;
     }
 
-    function timeOutHuntingSeason() external {
+    function timeOutHuntingSeason() external onlyOwner {
+        if (!isHuntingSeason) return;
+
         balanceOfRewardToken = getBalanceRewardToken().mul(70).div(100);
         // reward all users
         uint256 balance = stakingToken.totalSupply();
@@ -227,7 +235,7 @@ import "hardhat/console.sol";
         }
 
         staker.tokenIds.push(_tokenId);
-        staker.tokenIndex[staker.tokenIds.length - 1];
+        staker.tokenIndex[_tokenId] = staker.tokenIds.length - 1;
 
         // _burn(_tokenId);
         stakingToken.transferFrom(_user, address(this), _tokenId);
@@ -283,6 +291,7 @@ import "hardhat/console.sol";
         uint256 tokenIdIndex = staker.tokenIndex[_tokenId];
         staker.tokenIds[tokenIdIndex] = lastIndexKey;
         staker.tokenIndex[lastIndexKey] = tokenIdIndex;
+
         if (staker.tokenIds.length > 0) {
             staker.tokenIds.pop();
             delete staker.tokenIndex[_tokenId];
@@ -292,7 +301,7 @@ import "hardhat/console.sol";
             delete stakers[_user];
         }
         delete tokenRoyalty[_tokenId];
-        // _safeMint(_user, _tokenId);
+
         stakingToken.transferFrom(address(this), _user, _tokenId);
         emit Unstaked(_user, _tokenId);
     }

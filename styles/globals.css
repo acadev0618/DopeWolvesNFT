@@ -8,6 +8,14 @@ body {
 h1 {
     color: #676375  !important;
 }
+h2 {
+    color: #ffffff  !important;
+}
+
+h3 {
+    color: #676375  !important;
+    font-size: 15px;
+}
 
 button {
     background-color:#3772ff  !important;
