@@ -3,6 +3,8 @@ import { ethers } from "ethers";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import Web3Modal from "web3modal";
+import NoMetaMaskAlert from './NoMetaMaskAlert';
+import NoContractAlert from './NoContractAlert';
 
 import { nftaddress, nftmarketaddress } from "../config";
 
@@ -17,7 +19,10 @@ export default function Home() {
   const [huntingLabel, sethuntingLabel] = useState("Start H. Season");
   const [huntingState, sethuntingState] = useState(false);
   const [admin, setAdmin] = useState(false);
-  
+
+  const [noMetaMask, setNoMetaMask] = useState(false);
+  const [noContract, setNoContract] = useState(false);
+
   useEffect(() => {
     loadNFTs();
   }, []);
@@ -26,75 +31,85 @@ export default function Home() {
       network: "mainnet",
       cacheProvider: true,
     });
+
     /* create a generic provider and query for unsold market items */
+    if (!web3Modal.providerController.injectedProvider) {
+      setNoMetaMask(true);
+      document.body.style.overflow = 'hidden';
+      return;
+    }
+
     const connection = await web3Modal.connect();
     const provider = new ethers.providers.Web3Provider(connection);
-
+    
     const signer = provider.getSigner();
     const address = await signer.getAddress();
-    const tokenContract = new ethers.Contract(nftaddress, DWNFT.abi, provider);
 
+    const network = provider.getNetwork();
+    const networkId = (await network).chainId;
+    const nftdeployedNetwork = DWNFT.networks[networkId];
+
+    if (!nftdeployedNetwork){
+      setNoContract(true);
+    }
+    else {
+      const tokenContract = new ethers.Contract(nftaddress, DWNFT.abi, provider);    
+      const data = await tokenContract.walletOfOwner(address);
+      console.log("tokenContract", tokenContract);
+
+      const items = await Promise.all(
+        data.map(async (i) => {
+          const tokenUri = await tokenContract.tokenURI(i.toNumber());
+          const meta = await axios.get(tokenUri);
+          let imageurl = meta.data.image.replace("ipfs://", "https://img.tofunft.com/ipfs/");
+          console.log(imageurl);
+  
+          let item = {
+            tokenId: i.toNumber(),
+            image: imageurl,
+            name: meta.data.name,
+            description: meta.data.description,
+          };
+          return item;
+        })
+      );
+  
+      setNfts(items);
+    
     const stakecontract = new ethers.Contract(nftmarketaddress, DWNFTStaking.abi, signer);
     const isAdmin = await stakecontract.isAdmin();
-    setAdmin(isAdmin);
+      setAdmin(isAdmin);
+  
+      const hunting = await stakecontract.isHuntingSeason();
+      sethuntingState(hunting);
 
-    const hunting = await stakecontract.isHuntingSeason();
-    console.log("hunting ", hunting);
-    sethuntingState(hunting);
-    if (hunting)
-      sethuntingLabel("Stop H. Season");
-    else
-      sethuntingLabel("Start H. Season");
-
-    const data = await tokenContract.walletOfOwner(address);
-    const stakedData = await stakecontract.getStakedTokens(address);
-    console.log(stakedData);
-
-    /*
-     *  map over items returned from smart contract and format
-     *  them as well as fetch their token metadata
-     */
-    // const items  = {};
-    const items = await Promise.all(
-      data.map(async (i) => {
-        const tokenUri = await tokenContract.tokenURI(i.toNumber());
-        const meta = await axios.get(tokenUri);
-        let imageurl = meta.data.image.replace("ipfs://", "https://img.tofunft.com/ipfs/");
-        console.log(imageurl);
-
-        let item = {
-          tokenId: i.toNumber(),
-          image: imageurl,
-          name: meta.data.name,
-          description: meta.data.description,
-        };
-        return item;
-      })
-    );
-
-    setNfts(items);
-
-    const stakedItems = await Promise.all(
-      stakedData.map(async (i) => {
-        const tokenUri = await tokenContract.tokenURI(i.toNumber());
-        const meta = await axios.get(tokenUri);
-        let imageurl = meta.data.image.replace("ipfs://", "https://img.tofunft.com/ipfs/");
-        console.log(imageurl);
-
-        let item = {
-          tokenId: i.toNumber(),
-          image: imageurl,
-          name: meta.data.name,
-          description: meta.data.description,
-        };
-        return item;
-      })
-    );
-    setStakedNFTs(stakedItems);
-    console.log("staked data ", stakedNFTs);
-    
+      if (hunting)
+        sethuntingLabel("Stop H. Season");
+      else
+        sethuntingLabel("Start H. Season");
+  
+      const stakedData = await stakecontract.getStakedTokens(address);
+      const stakedItems = await Promise.all(
+        stakedData.map(async (i) => {
+          const tokenUri = await tokenContract.tokenURI(i.toNumber());
+          const meta = await axios.get(tokenUri);
+          let imageurl = meta.data.image.replace("ipfs://", "https://img.tofunft.com/ipfs/");
+          console.log(imageurl);
+  
+          let item = {
+            tokenId: i.toNumber(),
+            image: imageurl,
+            name: meta.data.name,
+            description: meta.data.description,
+          };
+          return item;
+        })
+      );
+      setStakedNFTs(stakedItems);
+    }
     setLoadingState("loaded");
   }
+
   async function stakeNft(nft) {
     /* needs the user to sign the transaction, so will use Web3Provider and sign it */
     const web3Modal = new Web3Modal();
@@ -163,6 +178,16 @@ export default function Home() {
     }
     loadNFTs();
   }
+
+  if (noMetaMask)
+  return (<div>
+    <NoMetaMaskAlert />
+  </div>)
+
+  if (noContract)
+  return (<div>
+    <NoContractAlert network={"networkType"} />
+  </div>)
 
   if (loadingState === "loaded" && !nfts.length)
     return <h1 className="px-20 py-10 text-3xl">No items in marketplace</h1>;
